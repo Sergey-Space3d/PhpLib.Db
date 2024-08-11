@@ -21,6 +21,8 @@ class CDbase
 		self::$m_login = $login;
 		self::$m_password = $password;
 		self::$m_default_name = $def_dbname;
+		
+		mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 	}
 	
 	/** Open/create database. Returns db link on success, throws exception on failure */
@@ -31,8 +33,15 @@ class CDbase
 	    
 	    if (!isset(self::$m_link[$dbname]))
 		{
-		    // Connect to specific database
-		    self::$m_link[$dbname] = @mysqli_connect(self::$m_host, self::$m_login, self::$m_password, $dbname);
+		    try 
+		    {
+		        // Connect to specific database
+		        self::$m_link[$dbname] = @mysqli_connect(self::$m_host, self::$m_login, self::$m_password, $dbname);
+		        
+		    } catch (Exception $e) 
+		    {
+		        unset(self::$m_link[$dbname]);
+		    }
 		    
 		    if (!self::$m_link[$dbname])
 		    {
@@ -83,11 +92,26 @@ class CDbase
 	/** Add user to the databases */
 	public static function add_user($login, $password, array $dbases)
 	{
+	    $link = self::create_link();
+	    $user = "'{$login}'@'".self::$m_host."'";
+	    
+	    try 
+	    { 
+	        mysqli_query($link, "CREATE USER {$user} IDENTIFIED BY '{$password}'"); 
+	    }
+	    catch (Exception $e) 
+	    {
+	        // The user exists - just update the password
+	        mysqli_query($link, "SET PASSWORD FOR {$user}=PASSWORD('{$password}')");
+	    }
+
+	    mysqli_close($link);
+	    
 	    foreach ($dbases as $dbname)
 	    {
 	        $link = self::open($dbname);
-	        mysqli_query($link, "GRANT ALL PRIVILEGES ON {$dbname}.* TO {$login}@".self::$m_host." IDENTIFIED BY '{$password}'")
-	        or self::on_error("can't grant priviliges to {$login}", $link);
+	        mysqli_query($link, "GRANT ALL PRIVILEGES ON {$dbname}.* TO {$user} WITH GRANT OPTION")
+	        or self::on_error("can't grant priviliges to {$user}", $link);
 	    }
 	}
 	
@@ -95,9 +119,14 @@ class CDbase
 	public static function remove_user($login)
 	{
 	    $link = self::create_link();
+	    $user = "'{$login}'@'".self::$m_host."'";
 	    
-	    mysqli_query($link, "DROP USER IF EXISTS {$login}@".self::$m_host)
-	    or self::on_error("can't remove user {$login}", $link);
+	    // Skip exception because of the differences between MySQL 5 and 8
+	    try { mysqli_query($link, "REVOKE ALL PRIVILEGES ON *.* FROM {$user}"); }
+	    catch (Exception $e) {}
+	    
+	    try { mysqli_query($link, "DROP USER IF EXISTS {$user}"); }
+	    catch (Exception $e) {}
 
 	    mysqli_close($link);
 	}

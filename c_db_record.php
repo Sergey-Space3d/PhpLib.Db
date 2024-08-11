@@ -82,7 +82,7 @@ abstract class CDbRecord
 	
 	protected final function field_to_int($field) { $this->m_fields[$field] = (int)$this->m_fields[$field]; }
 	protected final function field_to_float($field) { $this->m_fields[$field] = (float)$this->m_fields[$field]; }
-	protected final function field_to_bool($field) { $this->m_fields[$field] = (bool)$this->m_fields[$field]; }
+	protected final function field_to_bool($field) { $this->m_fields[$field] = (int)$this->m_fields[$field]; }
 	
 	/** Delete record. Returns true on success */
 	public function delete()
