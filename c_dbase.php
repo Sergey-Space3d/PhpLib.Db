@@ -5,22 +5,23 @@
 /** Database class */
 class CDbase
 {
-	protected static $m_link = array();
-	protected static $m_default_name = null;
-	protected static $m_host = null;
-	protected static $m_login = null;
-	protected static $m_password = null;
+	protected static $Link = array();
+	protected static $DefaultName = null;
 	
-	public static function get_link($dbname) { return self::$m_link[$dbname]; }
-	public static function get_default_name() { return self::$m_default_name; }
+	public static $Host = null;
+	public static $Login = null;
+	public static $Password = null;
+	
+	public static function get_link($dbname) { return self::$Link[$dbname]; }
+	public static function get_default_name() { return self::$DefaultName; }
 	
 	/** Initialize database connection */
 	public static function connect($host, $login, $password, $def_dbname = null)
 	{
-		self::$m_host = $host;
-		self::$m_login = $login;
-		self::$m_password = $password;
-		self::$m_default_name = $def_dbname;
+		self::$Host = $host;
+		self::$Login = $login;
+		self::$Password = $password;
+		self::$DefaultName = $def_dbname;
 		
 		mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 	}
@@ -28,22 +29,22 @@ class CDbase
 	/** Open/create database. Returns db link on success, throws exception on failure */
 	public static function open($dbname)
 	{
-	    if (!$dbname) $dbname = self::$m_default_name;
+	    if (!$dbname) $dbname = self::$DefaultName;
 	    if (!$dbname) self::on_error("database name is not set");
 	    
-	    if (!isset(self::$m_link[$dbname]))
+	    if (!isset(self::$Link[$dbname]))
 		{
 		    try 
 		    {
 		        // Connect to specific database
-		        self::$m_link[$dbname] = @mysqli_connect(self::$m_host, self::$m_login, self::$m_password, $dbname);
+		        self::$Link[$dbname] = @mysqli_connect(self::$Host, self::$Login, self::$Password, $dbname);
 		        
 		    } catch (Exception $e) 
 		    {
-		        unset(self::$m_link[$dbname]);
+		        unset(self::$Link[$dbname]);
 		    }
 		    
-		    if (!self::$m_link[$dbname])
+		    if (!self::$Link[$dbname])
 		    {
     		    // Cannect to generic database
     		    $link = self::create_link();
@@ -55,19 +56,19 @@ class CDbase
     		    mysqli_close($link);
     		    
     		    // Connect to specific database
-    		    self::$m_link[$dbname] = mysqli_connect(self::$m_host, self::$m_login, self::$m_password, $dbname)
+    		    self::$Link[$dbname] = mysqli_connect(self::$Host, self::$Login, self::$Password, $dbname)
     		    or self::on_error("can't connect to {$dbname}");
 		    }
 		}
 		
-		return self::$m_link[$dbname];
+		return self::$Link[$dbname];
 	}
 
 	/** Create link to access database. Returns db link on success, throws exception on failure */
 	public static function create_link()
 	{
-	    $link = mysqli_connect(self::$m_host, self::$m_login, self::$m_password)
-	    or self::on_error("can't connect to ".self::$m_host);
+	    $link = mysqli_connect(self::$Host, self::$Login, self::$Password)
+	    or self::on_error("can't connect to ".self::$Host);
 	    return $link;
 	}
 	
@@ -85,7 +86,7 @@ class CDbase
 	    mysqli_query($link, "DROP DATABASE IF EXISTS ".$dbname) 
 	    or self::on_error("can't delete {$dbname}", $link);
 	    
-	    unset(self::$m_link[$dbname]);
+	    unset(self::$Link[$dbname]);
 	    CDbTable::on_delete_dbase($dbname);
 	}
 	
@@ -93,7 +94,7 @@ class CDbase
 	public static function add_user($login, $password, array $dbases)
 	{
 	    $link = self::create_link();
-	    $user = "'{$login}'@'".self::$m_host."'";
+	    $user = "'{$login}'@'".self::$Host."'";
 	    
 	    try 
 	    { 
@@ -119,7 +120,7 @@ class CDbase
 	public static function remove_user($login)
 	{
 	    $link = self::create_link();
-	    $user = "'{$login}'@'".self::$m_host."'";
+	    $user = "'{$login}'@'".self::$Host."'";
 	    
 	    // Skip exception because of the differences between MySQL 5 and 8
 	    try { mysqli_query($link, "REVOKE ALL PRIVILEGES ON *.* FROM {$user}"); }
