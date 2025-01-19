@@ -72,7 +72,11 @@ abstract class CDbRecordMan
 	    {
 	        foreach ($this->m_ondelete as $fn)
 	        {
-	            $fn($id);
+	            try 
+	            {
+	                $fn($id);
+	            } 
+	            catch(Exception $e) {}
 	        }
 	    }
 	    
@@ -80,8 +84,12 @@ abstract class CDbRecordMan
 	    {
 	        foreach ($this->m_dependents as $tname=>$fname)
     	    {
-    	        $table = new CDbTable($tname);
-    	        $table->delete("{$fname}={$id}");
+    	        try
+    	        {
+    	            $table = new CDbTable($tname);
+    	            $table->delete("{$fname}={$id}");
+    	        } 
+    	        catch(Exception $e) {}
     	    }
 	    }
 	    
@@ -89,16 +97,20 @@ abstract class CDbRecordMan
 	    {
 	        foreach ($this->m_references as $tname=>$fname)
 	        {
-	            $table = new CDbTable($tname);
-	            $result = $table->get("{$fname}={$id}", null, true);
-	            
-	            if ($result)
+	            try
 	            {
-	                foreach ($result as $row)
+	                $table = new CDbTable($tname);
+	                $result = $table->get("{$fname}={$id}", null, true);
+	                
+	                if ($result)
 	                {
-	                    $table->update($row['id'], array($fname=>0));
+	                    foreach ($result as $row)
+	                    {
+	                        $table->update($row['id'], array($fname=>0));
+	                    }
 	                }
-	            }
+	            } 
+	            catch(Exception $e) {}
 	        }
 	    }
 	    
