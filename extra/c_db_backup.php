@@ -12,8 +12,8 @@ class CDbBackup
         $this->link = mysqli_connect($host, $login, $password);
     }
     
-    /** Backup database(s). Throws exception on failure */
-    public function backup($path, array $dbases = null)
+    /** Backup database(s). Throws exception on failure. Returns list of processed tables */
+    public function backup($path, array $dbases = null, $tables = null)
     {
         $dbnames = $dbases ? $dbases : $this->get_databases();
         if (!$dbnames) $this->on_error("Failed to get database names");
@@ -26,6 +26,8 @@ class CDbBackup
         {
             self::hide_path($path, false);
         }
+        
+        $processed = array();
         
         foreach ($dbnames as $dbname)
         {
@@ -52,7 +54,7 @@ class CDbBackup
                 while ($tb_row = mysqli_fetch_row($tb_result))
                 {
                     $table = $tb_row[0];
-                    if (!$table) continue;
+                    if (!$this->is_table_included($table, $tables)) continue;
                     
                     $str = "";
                     $str .= $this->get_def($table);
@@ -63,6 +65,8 @@ class CDbBackup
                     $fp = fopen($backup_filename, "a");
                     fwrite($fp, $str);
                     fclose($fp);
+                    
+                    $processed[] = "{$dbname}.{$table}";
                 }
                 
                 mysqli_free_result($tb_result);
@@ -79,6 +83,7 @@ class CDbBackup
         }
         
         self::hide_path($path, true);
+        return $processed;
     }
     
     /** Email backup file. Throws exception on failure */
@@ -258,14 +263,31 @@ class CDbBackup
     /** Returns true if dbase shall be included in output, false otherwise */
     protected function is_dbase_included($dbstr, array $dbases = null)
     {
-        if (!$dbases)
-        {
-            return true;
-        }
+        if (!$dbases) return true;
+        if (!$dbstr) return false;
         
         foreach ($dbases as $db)
         {
             if (stristr($dbstr, $db))
+            {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /** Returns true if table shall be included in output, false otherwise */
+    protected function is_table_included($table, array $tables = null)
+    {
+        if (!$tables) return true;
+        if (!$table) return false;
+        
+        $table = strtolower($table);
+        
+        foreach ($tables as $t)
+        {
+            if ($table == strtolower($t))
             {
                 return true;
             }
