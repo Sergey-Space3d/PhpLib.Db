@@ -270,7 +270,8 @@ abstract class CDbRecordMan
 	/** Get instance by condition */
 	public function get_instance($condition, $sort_by = null)
 	{
-	    return array_shift($this->get_instances($condition, $sort_by));
+	    $arr = $this->get_instances($condition, $sort_by);
+	    return array_shift($arr);
 	}
 	
 	/** Get instances by condition */
