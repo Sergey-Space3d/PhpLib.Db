@@ -322,20 +322,11 @@ class CDbTable
 		if (!$result || mysqli_num_rows($result) == 0)
 			return null;
 
-		$a_array = array();
-
-		while ($row = mysqli_fetch_assoc($result))
-		{
-			$arrray2 = array();
-
-			foreach ($row as $key => $val)
-				$arrray2[$key] = stripslashes($val);
-
-			$a_array[] = $arrray2;
-		}
+		$ret = array();
+		while ($row = mysqli_fetch_assoc($result)) { $ret[] = $row; }
 
 		mysqli_free_result($result);
-		return $a_array;
+		return $ret;
 	}
 
 	/** Get column info */
