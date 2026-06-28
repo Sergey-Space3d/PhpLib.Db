@@ -1,5 +1,5 @@
 <?php
-// Copyright 2005-2022 Sergey Shustov.
+// Copyright 2005-2026 Sergey Shustov.
 // License: GPL v2.  See License.txt.
 
 /** Db Record Manager Class (optional filter is applied) */

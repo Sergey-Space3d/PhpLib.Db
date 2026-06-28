@@ -1,4 +1,7 @@
 <?php
+// Copyright 2005-2026 Sergey Shustov.
+// License: GPL v2.  See License.txt.
+
 define('MMDDYYYY', 'm/d/Y');
 define('MMDDYYYY_HHMM', 'm/d/Y H:i');
 define('MMDDYYYY_HHMMSS', 'm/d/Y H:i:s');
