@@ -17,9 +17,9 @@ abstract class CDbRecordManSingleton extends CDbRecordMan
     }
     
     /** The constructor */
-    protected function __construct($table_name, $class_name)
+    protected function __construct($table_name, $class_name, $filter = null, $sort_by = null)
     {
-        parent::__construct($table_name, $class_name);
+    	parent::__construct($table_name, $class_name, $filter, $sort_by);
     }
 }
 ?>
