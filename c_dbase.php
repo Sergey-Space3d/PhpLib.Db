@@ -23,7 +23,7 @@ class CDbase
 		self::$Password = $password;
 		self::$DefaultName = $def_dbname;
 		
-		mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+		if (function_exists('mysqli_report')) mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 	}
 	
 	/** Open/create database. Returns db link on success, throws exception on failure */
