@@ -14,6 +14,7 @@ class CDbase
 	
 	public static function get_link($dbname) { return self::$Link[$dbname]; }
 	public static function get_default_name() { return self::$DefaultName; }
+	public static function normalize_user_name($login, $host) { return "'{$login}'@'{$host}'"; }
 	
 	/** Initialize database connection */
 	public static function connect($host, $login, $password, $def_dbname = null)
@@ -23,7 +24,7 @@ class CDbase
 		self::$Password = $password;
 		self::$DefaultName = $def_dbname;
 		
-		if (function_exists('mysqli_report')) mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+		if (function_exists('mysqli_report')) @mysqli_report(MYSQLI_REPORT_ERROR);
 	}
 	
 	/** Open/create database. Returns db link on success, throws exception on failure */
@@ -38,8 +39,8 @@ class CDbase
 		    {
 		        // Connect to specific database
 		        self::$Link[$dbname] = @mysqli_connect(self::$Host, self::$Login, self::$Password, $dbname);
-		        
-		    } catch (Exception $e) 
+		    } 
+		    catch (Exception $e) 
 		    {
 		        unset(self::$Link[$dbname]);
 		    }
@@ -50,13 +51,13 @@ class CDbase
     		    $link = self::create_link();
     
     		    // Create the database
-    		    mysqli_query($link, "CREATE DATABASE IF NOT EXISTS ".$dbname)
+    		    @mysqli_query($link, "CREATE DATABASE IF NOT EXISTS ".$dbname)
     		    or self::on_error("can't create {$dbname}", $link);
     		    
-    		    mysqli_close($link);
+    		    @mysqli_close($link);
     		    
     		    // Connect to specific database
-    		    self::$Link[$dbname] = mysqli_connect(self::$Host, self::$Login, self::$Password, $dbname)
+    		    self::$Link[$dbname] = @mysqli_connect(self::$Host, self::$Login, self::$Password, $dbname)
     		    or self::on_error("can't connect to {$dbname}");
 		    }
 		}
@@ -67,7 +68,7 @@ class CDbase
 	/** Create link to access database. Returns db link on success, throws exception on failure */
 	public static function create_link()
 	{
-	    $link = mysqli_connect(self::$Host, self::$Login, self::$Password)
+	    $link = @mysqli_connect(self::$Host, self::$Login, self::$Password)
 	    or self::on_error("can't connect to ".self::$Host);
 	    return $link;
 	}
@@ -75,7 +76,7 @@ class CDbase
 	/** Throw an exception */
 	public static function on_error($error, $link = null)
 	{
-	    if ($link) $link = ': '.mysqli_error($link);
+	    if ($link) $link = ': '.@mysqli_error($link);
 	    throw new Exception("Database failure: {$error}{$link}");
 	}
 	
@@ -83,7 +84,7 @@ class CDbase
 	public static function delete($dbname)
 	{
 	    $link = self::open($dbname);
-	    mysqli_query($link, "DROP DATABASE IF EXISTS ".$dbname) 
+	    @mysqli_query($link, "DROP DATABASE IF EXISTS ".$dbname) 
 	    or self::on_error("can't delete {$dbname}", $link);
 	    
 	    unset(self::$Link[$dbname]);
@@ -91,45 +92,71 @@ class CDbase
 	}
 	
 	/** Add user to the databases */
-	public static function add_user($login, $password, array $dbases)
+	public static function add_user($login, $password, array $dbases = null)
 	{
 	    $link = self::create_link();
-	    $user = "'{$login}'@'".self::$Host."'";
+	    $user = self::normalize_user_name($login, self::$Host);
+	    $has_create_user = true;
 	    
-	    try 
-	    { 
-	        mysqli_query($link, "CREATE USER {$user} IDENTIFIED BY '{$password}'"); 
-	    }
-	    catch (Exception $e) 
+	    if (function_exists('mysqli_get_server_info'))
 	    {
-	        // The user exists - just update the password
-	        mysqli_query($link, "SET PASSWORD FOR {$user}=PASSWORD('{$password}')");
+	    	// NOTE: "CREATE USER" was introduced in MySQL 5.0.2
+	    	$v = @mysqli_get_server_info($link);
+	    	$has_create_user = (float)substr($v, 0, 3) > 4.9;
 	    }
-
-	    mysqli_close($link);
 	    
-	    foreach ($dbases as $dbname)
+	    if ($has_create_user)
 	    {
-	        $link = self::open($dbname);
-	        mysqli_query($link, "GRANT ALL PRIVILEGES ON {$dbname}.* TO {$user} WITH GRANT OPTION")
+		    @mysqli_query($link, "CREATE USER {$user} IDENTIFIED BY '{$password}'")
+		    or self::on_error("can't create user {$user}", $link);
+	    }
+	    
+	    if ($dbases) foreach ($dbases as $dbname)
+	    {
+	        $statement = $has_create_user ? 
+	        "GRANT ALL PRIVILEGES ON {$dbname}.* TO {$user} WITH GRANT OPTION" :
+	        "GRANT ALL PRIVILEGES ON {$dbname}.* TO {$user} IDENTIFIED BY '{$password}'";
+	        
+	        @mysqli_query($link, $statement)
 	        or self::on_error("can't grant priviliges to {$user}", $link);
+	        
+	        $link2 = self::open($dbname);
+	        @mysqli_query($link2, "FLUSH PRIVILEGES");
+	        @mysqli_close($link2);
 	    }
+	    
+	    @mysqli_close($link);
 	}
 	
 	/** Remove user from the databases */
 	public static function remove_user($login)
 	{
 	    $link = self::create_link();
-	    $user = "'{$login}'@'".self::$Host."'";
+	    $user = self::normalize_user_name($login, self::$Host);
 	    
-	    // Skip exception because of the differences between MySQL 5 and 8
-	    try { mysqli_query($link, "REVOKE ALL PRIVILEGES ON *.* FROM {$user}"); }
-	    catch (Exception $e) {}
+	    @mysqli_query($link, "REVOKE ALL PRIVILEGES, GRANT OPTION FROM {$user}")
+	    or self::on_error("can't revoke all privileges from user {$user}", $link);
 	    
-	    try { mysqli_query($link, "DROP USER IF EXISTS {$user}"); }
-	    catch (Exception $e) {}
+	    @mysqli_query($link, "DROP USER {$user}")
+	    or self::on_error("can't drop user {$user}", $link);
 
-	    mysqli_close($link);
+	    @mysqli_close($link);
+	}
+	
+	/** Get normalized user names */
+	public static function get_users()
+	{
+		$arr = array();
+		$link = self::create_link();
+		$result = @mysqli_query($link, 'SELECT User, Host FROM mysql.user ORDER BY User, Host');
+		
+		while ($row = @mysqli_fetch_object($result))
+		{
+			$arr[] = self::normalize_user_name($row->User, $row->Host);
+		}
+		
+		@mysqli_close($link);
+		return $arr;
 	}
 	
 	/** Get database names */
@@ -137,9 +164,9 @@ class CDbase
 	{
 	    $arr = array();
 	    $link = self::create_link();
-	    $db_list = mysqli_query($link, 'SHOW DATABASES');
+	    $db_list = @mysqli_query($link, 'SHOW DATABASES');
 	    
-	    while ($row = mysqli_fetch_object($db_list))
+	    while ($row = @mysqli_fetch_object($db_list))
 	    {
 	        if (strcasecmp($row->Database, 'mysql') &&
 	            strcasecmp($row->Database, 'information_schema'))
@@ -148,7 +175,7 @@ class CDbase
 	        }
 	    }
 	    
-	    mysqli_close($link);
+	    @mysqli_close($link);
 	    return $arr;
 	}
 	
@@ -159,16 +186,16 @@ class CDbase
 	    $link = self::open($dbname);
 	    
 		// Get table names
-	    $tb_result = mysqli_query($link, "SHOW TABLES FROM ".$dbname);
+	    $tb_result = @mysqli_query($link, "SHOW TABLES FROM ".$dbname);
 
 		if ($tb_result)
 		{
-    		while ($tb_row = mysqli_fetch_row($tb_result))
+    		while ($tb_row = @mysqli_fetch_row($tb_result))
     		{
     		    $arr[] = $tb_row[0];
     		}
     		
-    		mysqli_free_result($tb_result);
+    		@mysqli_free_result($tb_result);
 		}
 		
 		return $arr;
