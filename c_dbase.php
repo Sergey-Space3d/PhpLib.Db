@@ -165,11 +165,11 @@ class CDbase
 	    $arr = array();
 	    $link = self::create_link();
 	    $db_list = @mysqli_query($link, 'SHOW DATABASES');
+	    $reserved_tables = ['mysql', 'information_schema', 'performance_schema'];
 	    
 	    while ($row = @mysqli_fetch_object($db_list))
 	    {
-	        if (strcasecmp($row->Database, 'mysql') &&
-	            strcasecmp($row->Database, 'information_schema'))
+	        if (!in_array($row->Database, $reserved_tables))
 	        {
 	            $arr[] = $row->Database;
 	        }
