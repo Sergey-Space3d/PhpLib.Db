@@ -22,6 +22,12 @@ class CDbRestore
         @set_time_limit(ini_get('max_execution_time'));
         $gzfilename = self::gzfilename_from_dbname($path, $dbname);
         
+        if (!file_exists($gzfilename))
+        {
+            throw new Exception("Invalid database archive {$gzfilename}");
+        }
+        
+        $mod = substr(sprintf('%o', fileperms($path)), -4);
         @chmod($path, 0755);
 
         try
@@ -50,11 +56,11 @@ class CDbRestore
         }
         catch(Exception $e)
         {
-            @chmod($path, 0640);
+            @chmod($path, $mod);
             throw $e;
         }
         
-        @chmod($path, 0640);
+        @chmod($path, $mod);
     }
     
     /** Make GZ filename from db name */
